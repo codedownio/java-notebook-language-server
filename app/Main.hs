@@ -13,6 +13,7 @@ import Control.Monad.IO.Unlift
 import Control.Monad.Logger
 import Control.Monad.Reader
 import Data.Aeson as A hiding (Options)
+import qualified Data.Aeson.KeyMap as KM
 import qualified Data.Aeson.Types as A
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as BL8
@@ -203,7 +204,7 @@ readWrappedOut config debugServerReads clientReqMap serverReqMap wrappedOut send
     Right (x :: A.Value) -> do
       when debugServerReads $ logInfoN [i|SERVER READ: #{BL8.unpack (A.encode x)}|]
       m <- readMVar clientReqMap
-      case A.parseEither (parseServerMessage (lookupClientId m)) x of
+      case A.parseEither (parseServerMessage (lookupClientId m)) (emptyResultToNull x) of
         Left err -> do
           logErr [i|Couldn't decode server message: #{A.encode x} (#{err})|]
           sendToStdout x
@@ -245,6 +246,22 @@ resolveBinary name = \case
   Nothing -> findExecutable name >>= \case
     Just x -> return x
     Nothing -> throwIO $ userError [i|Couldn't find #{name} binary.|]
+
+-- | Rewrite a response whose result is @{}@ to one whose result is @null@.
+--
+-- jdtls answers `shutdown` with @{}@, but LSP says that result must be null. A client strict
+-- enough to decode by method -- lsp-test is -- cannot read the reply, so it sits out its
+-- timeout waiting for one that already arrived, and the session takes minutes to close
+-- instead of milliseconds. The two are the same thing in JSON terms, so normalising it is
+-- free, and normalising is what a proxy is for.
+--
+-- Only touches an empty object, so a real result is never clobbered.
+emptyResultToNull :: A.Value -> A.Value
+emptyResultToNull (A.Object o)
+  | Just (A.Object inner) <- KM.lookup "result" o
+  , KM.null inner
+  , KM.member "id" o = A.Object (KM.insert "result" A.Null o)
+emptyResultToNull v = v
 
 logErr :: MonadLoggerIO m => Text -> m ()
 logErr = logInfoN

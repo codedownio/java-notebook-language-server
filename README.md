@@ -103,12 +103,9 @@ for every line inside a method or class body.
 
 ## Status
 
-The projection, its position mapping and the server wiring work, covered by unit tests.
-
-The integration tests in `test/Test/Notebook.hs` are written but **pending**: every scenario
-has been confirmed by hand against the jdtls `codedown-languages` ships, but inside the test
-sandbox jdtls starts, logs its bundles and then stops answering. See the note at the top of
-that module for what has been ruled out.
+Working, covered by `stack test`: the projection and its position mapping as unit tests, and
+hover, completion and diagnostics against a real jdtls over a notebook document as integration
+tests.
 
 Formatting is off (`notebookConfigHandlesFormatting = False`): it means untransforming a whole
 rewritten document rather than a position, and `SnippetSifter` has no `unproject` yet.

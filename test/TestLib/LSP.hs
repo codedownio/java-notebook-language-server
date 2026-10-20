@@ -108,8 +108,9 @@ doSession fileName codeToUse cb = do
           , Helpers.lspSessionOptionsExtraFiles = []
           , Helpers.lspSessionOptionsPathEnvVar = pathToUse
           , Helpers.lspSessionOptionsReadOnlyBinds = closure
-          -- JDT LS takes a minute or two to build its project on a cold workspace.
-          , Helpers.lspSessionOptionsModifySessionConfig = \x -> x { LSP.messageTimeout = 300 }
+          -- Generous, but never reached in practice: jdtls answers promptly even before
+          -- its project is ready, and waitUntil below handles the not-ready-yet answers.
+          , Helpers.lspSessionOptionsModifySessionConfig = \x -> x { LSP.messageTimeout = 90 }
           }
 
     Helpers.withLspSession lspSessionOptions cb
