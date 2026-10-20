@@ -1,0 +1,132 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.39.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           java-notebook-language-server
+version:        0.1.0.0
+build-type:     Simple
+extra-source-files:
+    README.md
+    CHANGELOG.md
+
+library
+  exposed-modules:
+      Language.LSP.Notebook
+      Language.LSP.Notebook.JavaParser
+      Language.LSP.Notebook.SnippetSifter
+      Transform.Config
+  other-modules:
+      Paths_java_notebook_language_server
+  hs-source-dirs:
+      src
+  default-extensions:
+      OverloadedStrings
+      QuasiQuotes
+      NamedFieldPuns
+      RecordWildCards
+      ScopedTypeVariables
+      FlexibleContexts
+      FlexibleInstances
+      LambdaCase
+      ViewPatterns
+      MultiParamTypeClasses
+      MultiWayIf
+      TupleSections
+      NumericUnderscores
+      TypeApplications
+  ghc-options: -Wunused-packages -Wall -fno-warn-name-shadowing
+  build-depends:
+      aeson
+    , base >=4.7 && <5
+    , binary
+    , bytestring
+    , containers
+    , lsp-types >=2.0.0.1
+    , notebook-language-server-core
+    , pcre-light
+    , process
+    , string-interpolate
+    , text
+    , unliftio
+    , vector
+  default-language: Haskell2010
+
+executable java-notebook-language-server
+  main-is: Main.hs
+  other-modules:
+      Streams
+      Paths_java_notebook_language_server
+  hs-source-dirs:
+      app
+  default-extensions:
+      OverloadedStrings
+      QuasiQuotes
+      NamedFieldPuns
+      RecordWildCards
+      ScopedTypeVariables
+      FlexibleContexts
+      FlexibleInstances
+      LambdaCase
+      ViewPatterns
+      MultiParamTypeClasses
+      MultiWayIf
+      TupleSections
+      NumericUnderscores
+      TypeApplications
+  ghc-options: -Wunused-packages -Wall -fno-warn-name-shadowing -threaded -rtsopts -with-rtsopts=-N -O2 -W
+  build-depends:
+      aeson
+    , base >=4.7 && <5
+    , bytestring
+    , java-notebook-language-server
+    , lens
+    , lsp-types >=2.0.0.1
+    , monad-logger
+    , mtl
+    , notebook-language-server-core
+    , optparse-applicative
+    , safe
+    , string-interpolate
+    , text
+    , unix
+    , unliftio
+    , unliftio-core
+  default-language: Haskell2010
+
+test-suite java-notebook-language-server-test
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      Test.Transformer.Mixed
+      Paths_java_notebook_language_server
+  hs-source-dirs:
+      test
+  default-extensions:
+      OverloadedStrings
+      QuasiQuotes
+      NamedFieldPuns
+      RecordWildCards
+      ScopedTypeVariables
+      FlexibleContexts
+      FlexibleInstances
+      LambdaCase
+      ViewPatterns
+      MultiParamTypeClasses
+      MultiWayIf
+      TupleSections
+      NumericUnderscores
+      TypeApplications
+  ghc-options: -Wunused-packages -Wall -fno-warn-name-shadowing -threaded -rtsopts -with-rtsopts=-N -O2 -W
+  build-depends:
+      base >=4.7 && <5
+    , java-notebook-language-server
+    , lsp-types >=2.0.0.1
+    , notebook-language-server-core
+    , sandwich
+    , string-interpolate
+    , text
+    , text-rope
+    , unliftio
+  default-language: Haskell2010

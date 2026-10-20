@@ -1,0 +1,87 @@
+name:                java-notebook-language-server
+version:             0.1.0.0
+
+extra-source-files:
+- README.md
+- CHANGELOG.md
+
+dependencies:
+- base >= 4.7 && < 5
+- lsp-types >= 2.0.0.1
+- string-interpolate
+- text
+- unliftio
+
+default-extensions:
+- OverloadedStrings
+- QuasiQuotes
+- NamedFieldPuns
+- RecordWildCards
+- ScopedTypeVariables
+- FlexibleContexts
+- FlexibleInstances
+- LambdaCase
+- ViewPatterns
+- MultiParamTypeClasses
+- MultiWayIf
+- TupleSections
+- NumericUnderscores
+- TypeApplications
+
+ghc-options:
+- -Wunused-packages
+- -Wall
+- -fno-warn-name-shadowing
+
+library:
+  source-dirs: src
+  dependencies:
+  - aeson
+  - binary
+  - bytestring
+  - containers
+  - notebook-language-server-core
+  - pcre-light
+  - process
+  - vector
+
+executables:
+  java-notebook-language-server:
+    main: Main.hs
+    source-dirs:
+    - app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -O2
+    - -W
+    dependencies:
+    - aeson
+    - bytestring
+    - java-notebook-language-server
+    - lens
+    - monad-logger
+    - mtl
+    - notebook-language-server-core
+    - optparse-applicative
+    - safe
+    - unix
+    - unliftio-core
+
+tests:
+  java-notebook-language-server-test:
+    main: Main.hs
+    source-dirs:
+    - test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -O2
+    - -W
+    dependencies:
+    - java-notebook-language-server
+    - notebook-language-server-core
+    - sandwich
+    - text-rope
