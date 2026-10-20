@@ -16,7 +16,7 @@ final: prev: {
         packages.file-io.components.library.configureFlags = [''-f os-string''];
         packages.process.components.library.configureFlags = [''-f os-string''];
 
-        packages.cpp-notebook-language-server.components.exes.cpp-notebook-language-server.dontStrip = false;
+        packages.java-notebook-language-server.components.exes.java-notebook-language-server.dontStrip = false;
       } (
         prev.lib.optionalAttrs prev.stdenv.isDarwin (import ../macos-modules.nix { pkgs = prev; })
       )];
