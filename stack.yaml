@@ -1,0 +1,38 @@
+resolver: nightly-2026-04-19
+
+packages:
+- .
+
+nix:
+  enable: false
+
+system-ghc: true
+
+extra-deps:
+- git: https://github.com/codedownio/notebook-language-server-core.git
+  commit: 244731900dee065cbf794ba74294f3a0f55c74fd
+
+- git: https://github.com/codedownio/sandwich
+  # long-running-nodes branch
+  commit: c3e16ccda384917fba1ccc5f3cf8f592415562c1
+  subdirs:
+  - sandwich
+  - sandwich-contexts
+  - sandwich-quickcheck
+
+- git: https://github.com/codedownio/lsp.git
+  # upgrade-monads-newest-jan2026 branch
+  commit: d920b28aa25d454812d8d9bbd922e893574d45bc
+  subdirs:
+  - lsp
+  - lsp-test
+  - lsp-types
+
+- git: https://github.com/codedownio/lsp-test-helpers.git
+  # main branch
+  commit: 98ed0dde02e9e784b4ab73f2d5330ee0a9a0b1e4
+
+# - language-cpp-0.2.0.27
+
+# - github: harpocrates/language-cpp
+#   commit: 9d509c450d009cc99f1180b3f2f30247dfb1cfce
