@@ -19,9 +19,8 @@ javaNotebookConfig :: ParserClient -> Int -> NotebookConfig JavaNotebookTransfor
 javaNotebookConfig client didSaveDebounceMs = NotebookConfig {
   notebookConfigHandles = const True
   , notebookConfigDidSaveDebounceMs = Just didSaveDebounceMs
-  -- Formatting a notebook would mean untransforming a whole rewritten document rather than a
-  -- position, and the projection throws away the information needed to put the synthetic
-  -- class back -- so it stays off until SnippetSifter implements `unproject`.
+  -- Formatting means untransforming a whole rewritten document, not a position, and the
+  -- projection can't be undone yet. Off until SnippetSifter implements `unproject`.
   , notebookConfigHandlesFormatting = False
   , notebookConfigTransformerParamsFor = \u ->
       if isNotebook u then transformerParams client else idTransformerParams

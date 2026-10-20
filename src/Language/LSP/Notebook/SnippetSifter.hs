@@ -3,25 +3,22 @@
 
 -- | Projecting a Java notebook into something javac will accept.
 --
--- A cell is a sequence of JShell snippets: imports, type and method declarations, variable
--- declarations, statements, and bare expressions, in any order. A @.java@ file is none of
--- those things -- it is imports, then one type declaration, with statements only inside method
--- bodies. So the projection sorts the snippets into the three places a Java file has for them:
+-- A cell is a sequence of JShell snippets in any order; a @.java@ file is imports, then one
+-- type, with statements only inside methods. So the projection sorts snippets into the three
+-- places a Java file has for them:
 --
 -- @
 -- <imports>
 -- class __Cells {
 -- <types, methods and explicitly-typed fields>
--- void __notebook_exec() throws Exception {
+-- void __notebookExec() throws Exception {
 -- <statements, and expressions wrapped so they are statements>
 -- }
 -- }
 -- @
 --
--- Every synthetic line is a line of its own and nothing is indented, which is the one piece of
--- luck in this transform: Java ignores whitespace, so no original line ever moves sideways and
--- position mapping is a pure line permutation. (The C++ projection indents its wrapper body
--- and has to add and subtract two columns on the way through.)
+-- Nothing is indented and every synthetic line is its own line, so no original line moves
+-- sideways and position mapping is a pure line permutation.
 module Language.LSP.Notebook.SnippetSifter (
   SnippetSifter(..)
   , SnippetSifterParams(..)
@@ -46,10 +43,8 @@ import Language.LSP.Protocol.Types
 import Language.LSP.Transformer
 
 
--- | The projection, stored as the line permutation it amounts to.
---
--- Both directions are kept so transforming and untransforming a position are both O(1), which
--- matters because they happen on every request and every response.
+-- | The projection, as the line permutation it amounts to. Both directions are kept so
+-- mapping a position either way is O(1); it happens on every request and response.
 data SnippetSifter = SnippetSifter {
   -- | @forward ! originalLine@ is the line it was projected to, or -1 if it was dropped.
   forward :: Vector Int
@@ -65,10 +60,8 @@ data SnippetSifterParams =
     -- | Name of the synthetic method holding the notebook's statements.
     , execMethodName :: Text
     }
-  -- | Leave the document alone. A real @.java@ file in the environment is already a valid
-  -- compilation unit, so it is handed to the server untouched; this is not a degenerate case
-  -- of the projection but the absence of one, and saying so explicitly keeps it out of the
-  -- error path.
+  -- | Leave the document alone: a real @.java@ file is already a compilation unit. Explicit
+  -- rather than a degenerate projection, so it stays out of the error path.
   | IdentityParams
 
 instance Transformer SnippetSifter where
@@ -101,9 +94,8 @@ instance MonadIO m => ProjectIn m SnippetSifter where
         lineCount = length originalLines
 
     parseDocument (parserClient params) (T.intercalate "\n" originalLines) >>= \case
-      -- The parser is how we know where anything goes, so without it the honest thing is to
-      -- pass the document through untouched. The server will complain about it, but the
-      -- complaints will at least be about lines the user can see.
+      -- Without the parser we don't know where anything goes. Passing the document through
+      -- means the server's complaints are at least about lines the user can see.
       Left err -> pure (doc, identitySifter lineCount, Left (T.pack err))
       Right units -> do
         let plan = buildPlan params originalLines units
@@ -124,16 +116,16 @@ fromOriginal originalLines i = Piece (originalLines !! i) (Just i)
 classLine :: Text -> Text
 classLine name = "class " <> name <> " {"
 
--- | @throws Exception@ because notebook code calls throwing methods without ceremony, and an
--- unhandled-exception error on every such line would bury the diagnostics that matter.
+-- | @throws Exception@ so that calling a throwing method doesn't produce an error on every
+-- such line, burying the diagnostics that matter.
 execLine :: Text -> Text
 execLine name = "void " <> name <> "() throws Exception {"
 
 closeLine :: Text
 closeLine = "}"
 
--- | A bare expression is not a statement, so it is assigned to something. The prefix and
--- suffix get lines of their own so the expression's own lines keep their exact columns.
+-- | A bare expression isn't a statement, so it gets assigned to something. Prefix and suffix
+-- take their own lines, so the expression's lines keep their exact columns.
 expressionPrefix :: Int -> Text
 expressionPrefix n = "Object __expr" <> T.pack (show n) <> " ="
 
@@ -156,16 +148,13 @@ buildPlan params originalLines units =
     importLines = [i | i <- [0 .. lineCount - 1], categoryOf i == Just CategoryImport]
     declarationLines = [i | i <- [0 .. lineCount - 1], categoryOf i == Just CategoryDeclaration]
 
-    -- Everything else, in original order: statements, expressions, and the lines no snippet
-    -- claimed (blank lines and free-standing comments). Those have to land somewhere so that
-    -- a position on them still maps, and the method body is the only place that accepts
-    -- anything.
+    -- Everything else in original order, including lines no snippet claimed: they have to
+    -- land somewhere for a position on them to map, and the body accepts anything.
     bodyLines = [i | i <- [0 .. lineCount - 1]
                    , categoryOf i /= Just CategoryImport
                    , categoryOf i /= Just CategoryDeclaration]
 
-    -- Expressions are wrapped as a unit, so the body is built from runs of lines rather than
-    -- line by line.
+    -- Expressions wrap as a unit, so the body is built from runs rather than single lines.
     expressionSpans = M.fromList [(unitStartLine u, unitEndLine u)
                                  | u <- units, unitCategory u == CategoryExpression]
 
@@ -183,8 +172,7 @@ buildPlan params originalLines units =
             <> go (n + 1) rest
           _ -> map (fromOriginal originalLines) run <> go n rest
 
-    -- Split the body lines into the runs that have to stay together: one run per expression
-    -- span, and single-line runs for everything else.
+    -- One run per expression span, single-line runs for everything else.
     groupBodyLines :: [Int] -> [[Int]]
     groupBodyLines [] = []
     groupBodyLines (i : rest) = case M.lookup i expressionSpans of
@@ -195,12 +183,9 @@ buildPlan params originalLines units =
 
 -- | Which category each original line belongs to, or 'Nothing' if no snippet covers it.
 --
--- A line can be covered by more than one snippet when two are written on one line
--- (@int x = 1; x + 1@). The more restrictive placement wins: an import has to be outside the
--- class and a declaration has to be outside the method, so the line goes to the outermost
--- place any of its snippets needs. That can put a statement in the class body, which is
--- invalid -- but the alternative puts an import inside a class, which is invalid *and* makes
--- every name in the document unresolvable.
+-- Two snippets can share a line (@int x = 1; x + 1@). The outermost placement wins: that can
+-- strand a statement in the class body, but the alternative stranding an import inside the
+-- class makes every name in the document unresolvable.
 lineCategories :: [Unit] -> Int -> (Int -> Maybe Category)
 lineCategories units lineCount = \i ->
   if i < 0 || i >= lineCount then Nothing else table V.! i

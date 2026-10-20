@@ -1,10 +1,7 @@
--- | Talking to @java-parser@, which splits a document into top-level Java snippets and says
--- what each one is.
+-- | Talking to @java-parser@, which splits a document into Java snippets and classifies them.
 --
--- The other notebook language servers fork their parser once per projection. This one holds a
--- single process open for the life of the server instead, because the parser is a JVM: forking
--- costs ~350ms against ~4ms for a round trip on a warm process, and a projection happens on
--- every document change. See java-parser/src/JavaParser.java.
+-- Held open for the life of the server rather than forked per projection, like the other
+-- proxies do: the parser is a JVM, so that is ~350ms against ~4ms warm.
 module Language.LSP.Notebook.JavaParser (
   Category(..)
   , Unit(..)
@@ -31,14 +28,13 @@ import UnliftIO.Process
 
 -- | Where a snippet has to end up in the projected document.
 data Category =
-  -- | An import, which has to go above the synthetic class.
+  -- | Has to go above the synthetic class.
   CategoryImport
-  -- | A type, method, or field with an explicit type: goes in the class body.
+  -- | A type, method, or explicitly-typed field: goes in the class body.
   | CategoryDeclaration
-  -- | Executable code, legal as-is inside a method body.
+  -- | Legal as-is inside a method body.
   | CategoryStatement
-  -- | Executable code that is not a statement -- a bare @x + 1@ -- so the projection has to
-  -- wrap it in something that is.
+  -- | Not a statement -- a bare @x + 1@ -- so the projection has to wrap it in one.
   | CategoryExpression
   deriving (Show, Eq, Ord)
 
@@ -50,11 +46,10 @@ instance FromJSON Category where
     "EXPRESSION" -> pure CategoryExpression
     other -> fail [i|Unknown snippet category: #{other}|]
 
--- | One top-level snippet. Lines and characters are 0-based, and characters are UTF-16 code
--- units, matching LSP.
+-- | Lines and characters are 0-based, characters in UTF-16 code units, matching LSP.
 data Unit = Unit {
   unitCategory :: Category
-  -- | JShell's own name for the snippet kind, carried through for diagnostics and tests.
+  -- | JShell's own names, carried through for diagnostics and tests.
   , unitKind :: Text
   , unitSubKind :: Text
   , unitStartLine :: Int
@@ -73,8 +68,8 @@ instance FromJSON Unit where
     <*> o .: "endLine"
     <*> o .: "endCh"
 
--- | A handle on the parser. The 'MVar' is the request lock as well as the state: only one
--- round trip can be in flight, since the protocol has no request ids.
+-- | The 'MVar' is the request lock as well as the state: the protocol has no request ids, so
+-- only one round trip can be in flight.
 data ParserClient =
   ParserClient (MVar ParserProcess)
   -- | A canned response, for tests that shouldn't need a JVM.
@@ -92,8 +87,7 @@ newParserClient path extraArgs = liftIO $ do
   (Just pIn, Just pOut, _, ph) <- createProcess (proc path (extraArgs <> ["--serve"])) {
     std_in = CreatePipe
     , std_out = CreatePipe
-    -- Left inheriting the server's stderr, so a JVM stack trace shows up in the log rather
-    -- than filling a pipe nobody drains.
+    -- Inherited so a JVM stack trace reaches the log instead of filling a pipe nobody drains.
     , std_err = Inherit
     , close_fds = True
     }
@@ -107,9 +101,8 @@ newParserClient path extraArgs = liftIO $ do
 stubParserClient :: (Text -> Either String [Unit]) -> ParserClient
 stubParserClient = StubParserClient
 
--- | Split and classify a document. A 'Left' means the parser could not be reached or did not
--- answer in the expected shape; callers fall back to the identity projection rather than
--- guessing at a structure.
+-- | 'Left' means the parser could not be reached or answered something unexpected; callers
+-- pass the document through rather than guess at a structure.
 parseDocument :: MonadIO m => ParserClient -> Text -> m (Either String [Unit])
 parseDocument (StubParserClient f) source = pure (f source)
 parseDocument (ParserClient processVar) source = liftIO $ try go >>= \case
@@ -127,8 +120,7 @@ parseDocument (ParserClient processVar) source = liftIO $ try go >>= \case
       response <- readExactly parserStdout responseLength
       pure $ eitherDecodeStrict response
 
--- | 'BS.hGet' can return short reads on a pipe, and a short read here would desynchronise the
--- stream for every later request.
+-- | 'BS.hGet' can short-read on a pipe, which would desynchronise every later request.
 readExactly :: Handle -> Int -> IO BS.ByteString
 readExactly h n
   | n <= 0 = pure BS.empty

@@ -84,13 +84,8 @@ main :: IO ()
 main = do
   Options {..} <- execParser fullOpts
 
-  wrappedLanguageServerPath <- (pure optWrappedLanguageServer <|> findExecutable "jdtls") >>= \case
-    Nothing -> throwIO $ userError [i|Couldn't find jdtls binary.|]
-    Just x -> return x
-
-  javaParserPath <- (pure optJavaParser <|> findExecutable "java-parser") >>= \case
-    Nothing -> throwIO $ userError [i|Couldn't find java-parser binary.|]
-    Just x -> return x
+  wrappedLanguageServerPath <- resolveBinary "jdtls" optWrappedLanguageServer
+  javaParserPath <- resolveBinary "java-parser" optJavaParser
 
   -- Started once and held open: it is a JVM, and forking one per projection would cost most
   -- of a second per keystroke. See Language.LSP.Notebook.JavaParser.
@@ -239,6 +234,17 @@ lookupClientId clientReqMap sid = do
   case lookupClientRequestMap clientReqMap sid of
     Nothing -> Nothing
     Just (SMethodAndParams meth initialParams) -> Just (meth, initialParams)
+
+-- | An explicit path if given, otherwise PATH. Note the obvious-looking
+-- `pure given <|> findExecutable name` does not work: that is Alternative IO, which falls
+-- through on an exception rather than on Nothing, so the explicit path always wins even when
+-- it is absent.
+resolveBinary :: String -> Maybe FilePath -> IO FilePath
+resolveBinary name = \case
+  Just x -> return x
+  Nothing -> findExecutable name >>= \case
+    Just x -> return x
+    Nothing -> throwIO $ userError [i|Couldn't find #{name} binary.|]
 
 logErr :: MonadLoggerIO m => Text -> m ()
 logErr = logInfoN

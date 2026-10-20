@@ -9,9 +9,8 @@ import Language.LSP.Notebook.SnippetSifter
 import Language.LSP.Transformer
 
 
--- | Java needs one transformation, not a pipeline: sorting snippets into the places a .java
--- file has for them. (The Haskell proxy chains seven, because Haskell cells need directives
--- rewritten and expressions and statements converted separately.)
+-- | One transformation, not a pipeline: sorting snippets into the places a .java file has
+-- for them.
 type JavaNotebookTransformer = SnippetSifter
 
 transformerParams :: ParserClient -> Params JavaNotebookTransformer

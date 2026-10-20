@@ -42,7 +42,6 @@ library:
   - containers
   - notebook-language-server-core
   - pcre-light
-  - process
   - vector
 
 executables:
@@ -81,7 +80,18 @@ tests:
     - -O2
     - -W
     dependencies:
+    - aeson
+    - containers
+    - directory
+    - exceptions
+    - filepath
     - java-notebook-language-server
+    - lens
+    - lsp-test
+    - lsp-test-helpers
+    - monad-logger
+    - mtl
     - notebook-language-server-core
     - sandwich
-    - text-rope
+    - sandwich-contexts
+    - temporary
