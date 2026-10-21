@@ -31,7 +31,6 @@ module Language.LSP.Notebook.SnippetSifter (
   ) where
 
 import Control.Monad.IO.Class
-import Data.Function (on)
 import qualified Data.List as L
 import qualified Data.Map.Strict as M
 import Data.Text (Text)
@@ -90,10 +89,10 @@ instance MonadIO m => ProjectIn m SnippetSifter where
   project IdentityParams doc =
     pure (doc, identitySifter (length (docToList doc)), Right ())
   project params doc = do
-    let originalLines = docToList doc
-        lineCount = length originalLines
+    let originalLines = V.fromList (docToList doc)
+        lineCount = V.length originalLines
 
-    parseDocument (parserClient params) (T.intercalate "\n" originalLines) >>= \case
+    parseDocument (parserClient params) (T.intercalate "\n" (V.toList originalLines)) >>= \case
       -- Without the parser we don't know where anything goes. Passing the document through
       -- means the server's complaints are at least about lines the user can see.
       Left err -> pure (doc, identitySifter lineCount, Left (T.pack err))
@@ -110,8 +109,8 @@ data Piece = Piece {
 synthetic :: Text -> Piece
 synthetic t = Piece t Nothing
 
-fromOriginal :: [Text] -> Int -> Piece
-fromOriginal originalLines i = Piece (originalLines !! i) (Just i)
+fromOriginal :: Vector Text -> Int -> Piece
+fromOriginal originalLines i = Piece (originalLines V.! i) (Just i)
 
 classLine :: Text -> Text
 classLine name = "class " <> name <> " {"
@@ -133,7 +132,7 @@ expressionSuffix :: Text
 expressionSuffix = ";"
 
 -- | Decide where every original line goes.
-buildPlan :: SnippetSifterParams -> [Text] -> [Unit] -> [Piece]
+buildPlan :: SnippetSifterParams -> Vector Text -> [Unit] -> [Piece]
 buildPlan params originalLines units =
      map (fromOriginal originalLines) importLines
   <> [synthetic (classLine (className params))]
@@ -142,8 +141,9 @@ buildPlan params originalLines units =
   <> bodyPieces
   <> [synthetic closeLine, synthetic closeLine]
   where
-    lineCount = length originalLines
-    categoryOf = lineCategories units lineCount
+    lineCount = V.length originalLines
+    categories = lineCategories units lineCount
+    categoryOf i = categories V.! i
 
     importLines = [i | i <- [0 .. lineCount - 1], categoryOf i == Just CategoryImport]
     declarationLines = [i | i <- [0 .. lineCount - 1], categoryOf i == Just CategoryDeclaration]
@@ -186,14 +186,21 @@ buildPlan params originalLines units =
 -- Two snippets can share a line (@int x = 1; x + 1@). The outermost placement wins: that can
 -- strand a statement in the class body, but the alternative stranding an import inside the
 -- class makes every name in the document unresolvable.
-lineCategories :: [Unit] -> Int -> (Int -> Maybe Category)
-lineCategories units lineCount = \i ->
-  if i < 0 || i >= lineCount then Nothing else table V.! i
+--
+-- Built by walking the units once rather than scanning every unit for every line, so this is
+-- linear in the lines they cover rather than lines times units.
+lineCategories :: [Unit] -> Int -> Vector (Maybe Category)
+lineCategories units lineCount =
+  V.accum keepOutermost (V.replicate lineCount Nothing)
+    [ (line, unitCategory u)
+    | u <- units
+    , line <- [max 0 (unitStartLine u) .. min (lineCount - 1) (unitEndLine u)]
+    ]
   where
-    table = V.generate lineCount $ \i ->
-      case [unitCategory u | u <- units, unitStartLine u <= i, i <= unitEndLine u] of
-        [] -> Nothing
-        cs -> Just (L.minimumBy (compare `on` placementRank) cs)
+    keepOutermost Nothing new = Just new
+    keepOutermost (Just old) new
+      | placementRank new < placementRank old = Just new
+      | otherwise = Just old
 
     placementRank :: Category -> Int
     placementRank CategoryImport = 0

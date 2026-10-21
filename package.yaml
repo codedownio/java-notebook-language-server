@@ -92,6 +92,8 @@ tests:
     - monad-logger
     - mtl
     - notebook-language-server-core
+    - QuickCheck
     - sandwich
     - sandwich-contexts
     - temporary
+    - unix

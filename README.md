@@ -94,9 +94,15 @@ before and after. Measured on JDK 21:
 | persistent, warm, 17 lines | ~4 ms |
 | persistent, warm, 240 lines | ~93 ms |
 
-So `java-parser --serve` is started once and held open, framing requests and responses as a
-four-byte big-endian length plus that many UTF-8 bytes. It is built from source by whoever
-packages the server rather than shipped as a release artifact, since it needs a JDK anyway.
+Those are round trips to the parser, which dominate; the projection built around the answer is
+linear in lines (the document is indexed as a vector, and the units are walked once to label
+lines rather than rescanned per line). So `java-parser --serve` is started once and held open,
+framing requests and responses as a four-byte big-endian length plus that many UTF-8 bytes. If
+it dies the client restarts it on the next request, because otherwise every later projection
+would silently fall back to passing the notebook through untransformed.
+
+It is built from source by whoever packages the server rather than shipped as a release
+artifact, since it needs a JDK anyway.
 
 Not yet done: only consulting JShell at brace depth zero, which would skip the per-line call
 for every line inside a method or class body.

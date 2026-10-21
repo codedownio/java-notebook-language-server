@@ -28,6 +28,10 @@ javaNotebookConfig client didSaveDebounceMs = NotebookConfig {
   , notebookConfigUnopenedUri = addExtensionToUri ".java"
   , notebookConfigOnDocumentsChanged = pure ()
   , notebookConfigTransformInitialize = pure
+  -- For a custom request whose params are a bare TextDocumentIdentifier, so its URI gets
+  -- rewritten to the shadow document's. jdtls has such methods -- java/classFileContents,
+  -- java/projectConfigurationUpdate -- but the first takes jdt:// URIs, which are never a
+  -- notebook, and nothing in codedown sends the second. Add them here if that changes.
   , notebookConfigCustomUriMethods = []
   , notebookConfigIgnoreSymbol = const False
   , notebookConfigLanguageName = "java"

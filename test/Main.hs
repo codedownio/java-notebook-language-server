@@ -6,6 +6,9 @@ import Test.Sandwich.Contexts.Nix
 import TestLib.LSP
 
 import qualified Test.Notebook
+import qualified Test.Parser
+import qualified Test.RawFile
+import qualified Test.Transformer.Diff
 import qualified Test.Transformer.Mixed
 
 
@@ -13,12 +16,17 @@ spec :: TopSpec
 spec = describe "java-notebook-language-server" $ do
   Test.Transformer.Mixed.spec
 
-  describe "Integration tests" $
+  describe "Against Nix-built binaries" $
     introduceMaybeBubblewrap $
-    introduceNixContext nixpkgsReleaseDefault $
-    introduceBinaryViaNixPackage @"jdtls" "jdt-language-server" $
-    introduceJnls $
-      Test.Notebook.spec
+    introduceNixContext nixpkgsReleaseDefault $ do
+      introduceJavaParser $ do
+        Test.Parser.spec
+        Test.Transformer.Diff.spec
+
+      introduceBinaryViaNixPackage @"jdtls" "jdt-language-server" $
+        introduceJnls $ do
+          Test.Notebook.spec
+          Test.RawFile.spec
 
 main :: IO ()
 main = runSandwichWithCommandLineArgs defaultOptions spec

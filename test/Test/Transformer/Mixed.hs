@@ -40,11 +40,20 @@ units = [
   ]
 
 params :: SnippetSifterParams
-params = SnippetSifterParams {
-  parserClient = stubParserClient (const (Right units))
+params = stubbed units
+
+stubbed :: [Unit] -> SnippetSifterParams
+stubbed us = SnippetSifterParams {
+  parserClient = stubParserClient (const (Right us))
   , className = "__Cells"
   , execMethodName = "__notebookExec"
   }
+
+voidCallCode :: Text
+voidCallCode = "System.out.println(1)"
+
+voidCallUnits :: [Unit]
+voidCallUnits = [Unit CategoryStatement "STATEMENT" "STATEMENT_SUBKIND" 0 0 0 21]
 
 -- | Imports above the class; the field and the method inside it; the statement and the
 -- expression inside the method, with the expression assigned to something so it is legal.
@@ -92,6 +101,13 @@ spec = describe "Mixed cell" $ do
     (_, sifter :: SnippetSifter, _) <- project params (listToDoc (T.splitOn "\n" testCode))
     -- Projected line 1 is "class __Cells {", which exists in no cell.
     untransformPosition sifter (Position 1 0) `shouldBe` Nothing
+
+  it "puts a void bare expression in the body without assigning it" $ do
+    -- The projection must not wrap this the way it wraps `x + 1`: assigning a void call is a
+    -- compile error. Test.Parser covers the classification; this covers what is done with it.
+    (projected, _ :: SnippetSifter, _) <- project (stubbed voidCallUnits) (listToDoc (T.splitOn "\n" voidCallCode))
+    T.intercalate "\n" (docToList projected) `shouldBe`
+      "class __Cells {\nvoid __notebookExec() throws Exception {\nSystem.out.println(1)\n}\n}"
 
   it "leaves a real .java file alone" $ do
     let doc = listToDoc (T.splitOn "\n" testCode)

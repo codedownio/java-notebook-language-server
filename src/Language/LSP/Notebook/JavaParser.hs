@@ -12,6 +12,7 @@ module Language.LSP.Notebook.JavaParser (
   , stubParserClient
   ) where
 
+import Control.Monad (void)
 import Control.Monad.IO.Class
 import Data.Aeson
 import qualified Data.Binary.Builder as B
@@ -69,9 +70,10 @@ instance FromJSON Unit where
     <*> o .: "endCh"
 
 -- | The 'MVar' is the request lock as well as the state: the protocol has no request ids, so
--- only one round trip can be in flight.
+-- only one round trip can be in flight. 'Nothing' means no process is running, either because
+-- none has been started yet or because the last one died.
 data ParserClient =
-  ParserClient (MVar ParserProcess)
+  ParserClient FilePath [String] (MVar (Maybe ParserProcess))
   -- | A canned response, for tests that shouldn't need a JVM.
   | StubParserClient (Text -> Either String [Unit])
 
@@ -81,9 +83,17 @@ data ParserProcess = ParserProcess {
   , parserHandle :: ProcessHandle
   }
 
--- | Start @java-parser --serve@. The process lives until the server exits.
+-- | Prepare to run @java-parser --serve@. The process itself starts on the first request.
 newParserClient :: MonadIO m => FilePath -> [String] -> m ParserClient
-newParserClient path extraArgs = liftIO $ do
+newParserClient path extraArgs =
+  liftIO $ ParserClient path extraArgs <$> newMVar Nothing
+
+-- | A client that answers from a pure function, for tests.
+stubParserClient :: (Text -> Either String [Unit]) -> ParserClient
+stubParserClient = StubParserClient
+
+spawn :: FilePath -> [String] -> IO ParserProcess
+spawn path extraArgs = do
   (Just pIn, Just pOut, _, ph) <- createProcess (proc path (extraArgs <> ["--serve"])) {
     std_in = CreatePipe
     , std_out = CreatePipe
@@ -95,30 +105,52 @@ newParserClient path extraArgs = liftIO $ do
   hSetBinaryMode pOut True
   hSetBuffering pIn (BlockBuffering Nothing)
   hSetBuffering pOut (BlockBuffering Nothing)
-  ParserClient <$> newMVar (ParserProcess pIn pOut ph)
+  pure (ParserProcess pIn pOut ph)
 
--- | A client that answers from a pure function, for tests.
-stubParserClient :: (Text -> Either String [Unit]) -> ParserClient
-stubParserClient = StubParserClient
+stop :: ParserProcess -> IO ()
+stop (ParserProcess {..}) = do
+  ignoring (hClose parserStdin)
+  ignoring (hClose parserStdout)
+  ignoring (terminateProcess parserHandle)
+  ignoring (void (waitForProcess parserHandle))
+  where
+    ignoring :: IO () -> IO ()
+    ignoring act = void (try act :: IO (Either SomeException ()))
 
 -- | 'Left' means the parser could not be reached or answered something unexpected; callers
 -- pass the document through rather than guess at a structure.
+--
+-- A JVM that has died -- out of memory, killed with the session it was serving -- would
+-- otherwise leave every later projection failing, so a failed round trip discards the process
+-- and tries once with a fresh one.
 parseDocument :: MonadIO m => ParserClient -> Text -> m (Either String [Unit])
 parseDocument (StubParserClient f) source = pure (f source)
-parseDocument (ParserClient processVar) source = liftIO $ try go >>= \case
-  Left (e :: SomeException) -> pure (Left [i|java-parser request failed: #{show e}|])
-  Right x -> pure x
+parseDocument (ParserClient path extraArgs processVar) source =
+  liftIO $ modifyMVar processVar $ \existing -> do
+    attempt existing >>= \case
+      Right result -> pure result
+      Left (firstError :: SomeException) -> do
+        mapM_ stop existing
+        attempt Nothing >>= \case
+          Right result -> pure result
+          Left (secondError :: SomeException) -> pure (Nothing, Left
+            [i|java-parser failed (#{show firstError}), and again after restarting (#{show secondError})|])
   where
-    go = withMVar processVar $ \(ParserProcess {..}) -> do
-      let payload = T.encodeUtf8 source
-      BL.hPut parserStdin (B.toLazyByteString (B.putWord32be (fromIntegral (BS.length payload))))
-      BS.hPut parserStdin payload
-      hFlush parserStdin
+    attempt existing = try $ do
+      process <- maybe (spawn path extraArgs) pure existing
+      response <- roundTrip process source
+      pure (Just process, eitherDecodeStrict response)
 
-      lengthBytes <- readExactly parserStdout 4
-      let responseLength = BS.foldl' (\acc w -> acc * 256 + fromIntegral w) (0 :: Int) lengthBytes
-      response <- readExactly parserStdout responseLength
-      pure $ eitherDecodeStrict response
+roundTrip :: ParserProcess -> Text -> IO BS.ByteString
+roundTrip (ParserProcess {..}) source = do
+  let payload = T.encodeUtf8 source
+  BL.hPut parserStdin (B.toLazyByteString (B.putWord32be (fromIntegral (BS.length payload))))
+  BS.hPut parserStdin payload
+  hFlush parserStdin
+
+  lengthBytes <- readExactly parserStdout 4
+  let responseLength = BS.foldl' (\acc w -> acc * 256 + fromIntegral w) (0 :: Int) lengthBytes
+  readExactly parserStdout responseLength
 
 -- | 'BS.hGet' can short-read on a pipe, which would desynchronise every later request.
 readExactly :: Handle -> Int -> IO BS.ByteString

@@ -13,7 +13,6 @@ import Control.Lens ((^.))
 import Data.String.Interpolate
 import Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text as T
 import Language.LSP.Protocol.Lens (label, message, range)
 import Language.LSP.Protocol.Types
 import Test.Sandwich

@@ -11,6 +11,7 @@ module TestLib.LSP (
 
   , introduceMaybeBubblewrap
   , introduceJnls
+  , introduceJavaParser
 
   , listShouldContain
   ) where
@@ -180,6 +181,27 @@ in flake.packages.x86_64-linux.staticWrapped
       liftIO (findExecutablesInDirectories [dir </> "bin"] "java-notebook-language-server") >>= \case
         (x:_) -> return (EnvironmentFile x :: EnvironmentFile "java-notebook-language-server")
         _ -> expectationFailure [i|Couldn't find binary in #{dir </> "bin"}|]
+
+-- | The parser on its own, for tests that drive the projection directly.
+introduceJavaParser :: forall context m. (
+  HasBaseContext context, HasNixContext context, MonadUnliftIO m
+  )
+  => SpecFree (LabelValue "file-java-parser" (EnvironmentFile "java-parser") :> context) m ()
+  -> SpecFree context m ()
+introduceJavaParser = introduce [i|java-parser (via Nix)|] (Label :: Label "file-java-parser" (EnvironmentFile "java-parser")) alloc (const $ return ())
+  where
+    alloc = do
+      projectRoot <- getProjectRoot
+      dir <- buildNixCallPackageDerivation [i|
+{ ... }:
+
+let
+  flake = builtins.getFlake "#{projectRoot}";
+in flake.packages.x86_64-linux.java-parser
+|]
+      liftIO (findExecutablesInDirectories [dir </> "bin"] "java-parser") >>= \case
+        (x:_) -> return (EnvironmentFile x :: EnvironmentFile "java-parser")
+        _ -> expectationFailure [i|Couldn't find java-parser in #{dir </> "bin"}|]
 
 getProjectRoot :: (HasCallStack, MonadIO m) => m FilePath
 getProjectRoot = do
