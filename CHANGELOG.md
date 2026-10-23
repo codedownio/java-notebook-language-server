@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1.0
+
+- Transform textDocument/selectionRange, textDocument/semanticTokens and the goto family, which reached the client in shadow coordinates
+- Transform textDocument/rename, prepareRename, references, signatureHelp and declaration, which reached the server naming the notebook
+
 ## 0.1.0.0
 
 Initial version.
