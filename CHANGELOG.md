@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2.0
+
+- Transform workspace/symbol answers, which named the shadow document instead of the notebook
+
 ## 0.1.1.0
 
 - Transform textDocument/selectionRange, textDocument/semanticTokens and the goto family, which reached the client in shadow coordinates

@@ -1,5 +1,5 @@
 name:                java-notebook-language-server
-version:             0.1.1.0
+version:             0.1.2.0
 
 extra-source-files:
 - README.md
