@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.3.0
+
+- Write the shadow document to disk before the server is told about it, which jdtls needs to answer a goto
+- Recognize the shadow document in an answer however the server escaped its path
+- Rewrite the shadow document's name and line in a hover's "Source:" link, which named a file the user doesn't have
+
 ## 0.1.2.0
 
 - Transform workspace/symbol answers, which named the shadow document instead of the notebook
