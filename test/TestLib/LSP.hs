@@ -203,11 +203,13 @@ in flake.packages.x86_64-linux.java-parser
         (x:_) -> return (EnvironmentFile x :: EnvironmentFile "java-parser")
         _ -> expectationFailure [i|Couldn't find java-parser in #{dir </> "bin"}|]
 
+-- | Found by the @.git@ the checkout has: a directory normally, a file naming the real one in
+-- a worktree, so this looks for either.
 getProjectRoot :: (HasCallStack, MonadIO m) => m FilePath
 getProjectRoot = do
   startDir <- getCurrentDirectory
   flip fix startDir $ \loop dir ->
-    doesDirectoryExist (dir </> ".git") >>= \case
+    doesPathExist (dir </> ".git") >>= \case
       True -> return dir
       False -> let dir' = takeDirectory dir in
                  if | dir == dir' -> throwIO $ userError [i|Couldn't find project root from #{startDir}|]
