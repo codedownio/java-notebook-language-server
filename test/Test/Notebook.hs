@@ -1,11 +1,15 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE PackageImports #-}
+{-# LANGUAGE TypeOperators #-}
 
 -- | Against a real jdtls, over a real notebook document.
 --
 -- The transformer tests cover the projection in isolation. These cover the two things they
 -- cannot: that the projection is something jdtls will actually compile, and that positions
 -- come back in cell coordinates.
+--
+-- Not the "Source:" link core rewrites in a hover: the jdtls nixpkgs gives this suite is
+-- 1.46.1, which doesn't add one.
 
 module Test.Notebook (spec) where
 
@@ -36,6 +40,15 @@ cells = [__i|import java.util.List;
              System.out.println(doubled(x));
              x + 1|]
 
+-- | The ranges a goto answer points at, keeping only those in the document asked about.
+locations :: TextDocumentIdentifier -> (Definition |? ([DefinitionLink] |? Null)) -> [Range]
+locations (TextDocumentIdentifier wanted) = \case
+  InL (Definition (InL loc)) -> ranges [loc]
+  InL (Definition (InR locs)) -> ranges locs
+  InR (InL links) -> ranges [Location u r | DefinitionLink (LocationLink _ u r _) <- links]
+  InR (InR Null) -> []
+  where ranges locs = [r | Location u r <- locs, u == wanted]
+
 spec :: (
   Helpers.LspContext ctx m
   , HasFile ctx "java-notebook-language-server"
@@ -51,6 +64,16 @@ spec = describe "Notebook" $ do
       waitUntil 300 $ do
         hover <- Helpers.getHoverOrException doc (Position 4 6)
         Helpers.allHoverText hover `textShouldContain` "int __Cells.doubled(int v)"
+
+  -- Answered out of jdtls's Java model rather than the didOpen text, so this covers core
+  -- writing the shadow document before the open, not just the untransform.
+  it "goes to a method declared in the notebook" $ do
+    doNotebookSession cells $ \(Helpers.LspSessionInfo {..}) -> do
+      doc <- LSP.openDoc lspSessionInfoFileName LanguageKind_Java
+
+      waitUntil 300 $ do
+        defs <- LSP.getDefinitions doc (Position 8 19)
+        locations doc defs `shouldBe` [Range (Position 4 4) (Position 4 11)]
 
   it "completes a method declared in an earlier cell" $ do
     doNotebookSession cells $ \(Helpers.LspSessionInfo {..}) -> do
