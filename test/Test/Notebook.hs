@@ -17,7 +17,7 @@ import Control.Lens ((^.))
 import Data.String.Interpolate
 import Data.Text (Text)
 import qualified Data.Text as T
-import Language.LSP.Protocol.Lens (label, message, range)
+import Language.LSP.Protocol.Lens (label, message, name, range)
 import Language.LSP.Protocol.Types
 import Test.Sandwich
 import Test.Sandwich.Contexts.Files
@@ -101,3 +101,20 @@ spec = describe "Notebook" $ do
         case [d ^. range | d <- diagnostics, "never used" `T.isInfixOf` (d ^. message)] of
           (r : _) -> r `shouldBe` Range (Position 0 7) (Position 0 21)
           [] -> expectationFailure [i|No unused-import diagnostic in: #{diagnostics}|]
+
+  -- jdtls answers with the projection's tree: everything hangs off the synthetic __Cells
+  -- class, which spans lines no cell owns. Core replaces a node it can't place with its
+  -- children, so the method surfaces at the top rather than the whole outline vanishing.
+  it "outlines a method declared in the notebook" $ do
+    doNotebookSession cells $ \(Helpers.LspSessionInfo {..}) -> do
+      doc <- LSP.openDoc lspSessionInfoFileName LanguageKind_Java
+
+      waitUntil 300 $ do
+        symbols <- LSP.getDocumentSymbols doc
+        info [i|Got document symbols: #{symbols}|]
+        case symbols of
+          Right documentSymbols ->
+            [(s ^. name, s ^. range) | s <- documentSymbols]
+              `listShouldContain` ("doubled(int)", Range (Position 4 0) (Position 6 1))
+          Left symbolInformations ->
+            expectationFailure [i|Expected a document symbol tree, got: #{symbolInformations}|]

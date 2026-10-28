@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.4.0
+
+- Answer textDocument/documentSymbol for a notebook, which came back empty because every cell symbol hangs off the projection's synthetic class
+
 ## 0.1.3.0
 
 - Write the shadow document to disk before the server is told about it, which jdtls needs to answer a goto
