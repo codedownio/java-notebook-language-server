@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.5.0
+
+- Transform the call and type hierarchies, whose answers named the shadow document and so couldn't be followed
+
 ## 0.1.4.0
 
 - Answer textDocument/documentSymbol for a notebook, which came back empty because every cell symbol hangs off the projection's synthetic class
