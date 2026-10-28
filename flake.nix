@@ -31,6 +31,8 @@
         flakeAarch64Linux = (pkgs.pkgsCross.aarch64-multiplatform.hixProject compiler-nix-name).flake {};
         flakeStaticAarch64Linux = (pkgs.pkgsCross.aarch64-multiplatform-musl.hixProject compiler-nix-name).flake {};
 
+        aarch64LinuxExe = flakeAarch64Linux.packages."java-notebook-language-server:exe:java-notebook-language-server";
+
         packageForGitHub = packageForGitHub' system;
 
         packageForGitHub' = systemToUse: jnls: pkgs.runCommand "java-notebook-language-server-${jnls.version}-${systemToUse}" {} ''
@@ -96,7 +98,7 @@
             dynamic = flake.packages."java-notebook-language-server:exe:java-notebook-language-server";
             darwin = flakeDarwin.packages."java-notebook-language-server:exe:java-notebook-language-server";
             aarch64Linux = let
-              executable = flakeAarch64Linux.packages."java-notebook-language-server:exe:java-notebook-language-server";
+              executable = aarch64LinuxExe;
             in linux-dynamic-bundler.lib.bundle {
               inherit pkgs;
               binaryDrv = executable;
@@ -133,6 +135,7 @@
                 name = "java-notebook-language-server-deps";
                 paths = dynamic.buildInputs ++ dynamic.nativeBuildInputs
                      ++ static.buildInputs ++ static.nativeBuildInputs
+                     ++ aarch64LinuxExe.buildInputs ++ aarch64LinuxExe.nativeBuildInputs
                      ++ devShellInputs;
               }}
             '';
